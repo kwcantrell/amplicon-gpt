@@ -87,13 +87,13 @@ class SampleEncoder(tf.keras.layers.Layer):
             keras_nlp.layers.TransformerEncoder(num_heads=num_heads, dropout=dropout,
                     activation='gelu', intermediate_dim=dff, normalize_first=norm_first,
                     name=f'base_encoder_block_{i}')
-            for i in range(num_enc_layers)])
+            for i in range(num_enc_layers)] + [tf.keras.layers.LayerNormalization()])
     
     def build(self, input_shape):
         def pad(x):
-            padddings = tf.constant([[0, 128], [0,0]])
+            padddings = tf.constant([[128, 0], [0,0]])
             output = tf.pad(x, padddings)
-            output = tf.strided_slice(output, begin=[0,0], end=[128, input_shape[2]])
+            output = tf.strided_slice(output, begin=[-129,0], end=[-1, input_shape[2]], strides=[1,1])
             return output
         pad_spec = tf.TensorSpec(shape=input_shape[1:], dtype=tf.float32)
         self.pad = create_concrete_tf_func(pad, tensor_spec=pad_spec)
@@ -124,13 +124,15 @@ class UniFracEncoder(tf.keras.layers.Layer):
     def __init__(self, dff, **kwargs):
         super().__init__(name="unifrac_embedding", **kwargs)
         self.ff = tf.keras.layers.Dense(128, activation='relu')
-        self.dropout = tf.keras.layers.Dropout(0.5)
+        self.norm = tf.keras.layers.LayerNormalization()
+        self.dropout = tf.keras.layers.Dropout(0.2)
         self.dense = tf.keras.layers.Dense(1)
     
     def build(self, input_shape):
 
         def vec_layer(input, training=None):
             output = self.ff(input)
+            output = self.norm(output)
             output = self.dropout(output, training=training)
             return output
         tensor_spec = tf.TensorSpec(shape=input_shape[1:], dtype=tf.float32)

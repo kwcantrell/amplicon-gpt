@@ -66,14 +66,14 @@ def transfer_learn_base(sequence_tokenizer, lstm_seq_out, batch_size, max_num_pe
 
         def call(self, inputs, training=None):
             @tf.function(
-                input_signature=[tf.RaggedTensorSpec(
-                    tf.TensorShape([batch_size, None, 1]), dtype=tf.string, ragged_rank=1)],
+                input_signature=[tf.TensorSpec(
+                    tf.TensorShape([batch_size, None, 1]), dtype=tf.string)],
                 reduce_retracing=True,
                 jit_compile=False
             ) 
             def _call(input):   
-                output = input.to_tensor()
-                output = self.seq_token(output)
+                # output = input.to_tensor()
+                output = self.seq_token(input)
                 output = self.embedding(output)
                 output = self.nuc(output)
                 output = self.samp(output)
@@ -119,7 +119,7 @@ class MAE(tf.keras.metrics.Metric):
         return self.loss / self.i
         
 def compile_model(model):
-    lr = tf.keras.optimizers.schedules.ExponentialDecay(0.0001, decay_steps=150000, decay_rate=0.9, staircase=True)
+    lr = 0.0001#tf.keras.optimizers.schedules.ExponentialDecay(0.0001, decay_steps=150000, decay_rate=0.9, staircase=True)
     optimizer = tf.keras.optimizers.AdamW(learning_rate=lr, epsilon=1e-7)
     model.compile(optimizer=optimizer,loss=unifrac_loss_var, metrics=[MAE()])
     return model

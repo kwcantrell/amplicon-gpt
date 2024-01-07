@@ -200,12 +200,10 @@ def get_unifrac_dataset(table_path, tree_path, **kwargs):
 def combine_seq_dist_dataset(seq_dataset, dist_dataset, batch_size, **kwargs):
     dataset_size = seq_dataset.cardinality()
     return (tf.data.Dataset
-            .zip(seq_dataset, dist_dataset)
-            .enumerate()
+            .zip(tf.data.Dataset.range(dataset_size), seq_dataset, dist_dataset)
             .shuffle(dataset_size, reshuffle_each_iteration=False)
             .prefetch(tf.data.AUTOTUNE)
     )
-
 def batch_dist_dataset(dataset, batch_size, shuffle=False, repeat=None, **kwargs):
     dataset = dataset.cache()
     size = dataset.cardinality()
@@ -213,10 +211,12 @@ def batch_dist_dataset(dataset, batch_size, shuffle=False, repeat=None, **kwargs
     if shuffle:
         dataset = dataset.shuffle(size, reshuffle_each_iteration=True)
 
-    get_pairwise_dist = lambda ind, x: (x[0], tf.gather(x[1], ind, axis=1, batch_dims=0))
+    def get_pairwise_dist(ind, seq, dist):
+        return (seq, tf.gather(dist, ind, axis=1, batch_dims=0))
+    
     dataset = (dataset
-        .ragged_batch(batch_size, drop_remainder=True)
-        .map(get_pairwise_dist, num_parallel_calls=tf.data.AUTOTUNE, deterministic=False)
+        .padded_batch(batch_size, padded_shapes=([], [None,1], [None]), drop_remainder=True)#, padding_values=(
+        .map(get_pairwise_dist)
     )
 
     if not shuffle:
