@@ -1,8 +1,8 @@
 import os
 from collections import namedtuple
 import tensorflow as tf
-import keras_nlp
 from amplicon_gpt.initializers import UnitUniform
+import tensorflow_models as tfm
 
 def create_tf_func(func, *args, jit_compile=True, **kwargs):
     return tf.function(
@@ -81,23 +81,28 @@ class SampleEncoder(tf.keras.layers.Layer):
         self.norm = tf.keras.layers.LayerNormalization()
         self.norm2 = tf.keras.layers.LayerNormalization()
 
-        self.encoding_blocks = tf.keras.Sequential([
-            keras_nlp.layers.TransformerEncoder(num_heads=num_heads, dropout=dropout,
-                    activation='gelu', intermediate_dim=dff, normalize_first=norm_first,
-                    name=f'base_encoder_block_{i}')
-            for i in range(num_enc_layers)] + [tf.keras.layers.LayerNormalization()])
+        self.encoding_blocks = tfm.nlp.models.TransformerEncoder(
+            num_layers=num_enc_layers,
+            num_attention_heads=8,
+            intermediate_size=2048,
+            dropout_rate=dropout,
+            norm_first=True,
+            activation='gelu',
+        )
+            
     
     def build(self, input_shape):
         def pad(x):
             padddings = tf.constant([[128, 0], [0,0]])
             output = tf.pad(x, padddings)
-            output = tf.stack(tf.strided_slice(output, begin=[-129,0], end=[-1, input_shape[2]], strides=[1,1]))
+            output = tf.strided_slice(output, begin=[-129,0], end=[-1, input_shape[2]], strides=[1,1])
             return output
         pad_spec = tf.TensorSpec(shape=input_shape[1:], dtype=tf.float32)
         self.pad = create_concrete_tf_func(pad, tensor_spec=pad_spec)
         
+        causal_mask = tf.cast(1 - tf.linalg.band_part(tf.ones((128, 128)), -1, 0), dtype=tf.bool)
         encoding_spec = tf.TensorSpec(shape=[input_shape[0], 128, input_shape[2]], dtype=tf.float32)
-        self.encoding_block_dict = create_tf_with_training_flag(self.encoding_blocks, encoding_spec)
+        self.encoding_block_dict = create_tf_with_training_flag(lambda x: self.encoding_blocks(x, attention_mask=causal_mask), encoding_spec)
 
     def call(self, input, training=False):
         print(training)

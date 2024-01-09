@@ -216,7 +216,9 @@ def batch_dist_dataset(dataset, batch_size, shuffle=False, repeat=None, **kwargs
     
     dataset = (dataset
         .padded_batch(batch_size, padded_shapes=([], [None,1], [None]), drop_remainder=True)#, padding_values=(
+        # .prefetch(tf.data.AUTOTUNE)
         .map(get_pairwise_dist)
+        # .prefetch(tf.data.AUTOTUNE)
     )
 
     if not shuffle:

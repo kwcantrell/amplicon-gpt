@@ -67,7 +67,7 @@ def transfer_learn_base(sequence_tokenizer, lstm_seq_out, batch_size, max_num_pe
             jit_compile=False
         ) 
         def call_statefull(self, input):
-            return tf.stack(self.lstm(input))
+            return self.lstm(input)
 
         def call(self, inputs, training=None):
             @tf.function(
